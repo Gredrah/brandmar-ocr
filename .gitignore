@@ -21,3 +21,5 @@
 
 # OCR Engine Ignore
 **/ocr-engine/test/samples
+ocr-engine/*.png
+ocr-engine/data/processed/test_*.png
