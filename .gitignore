@@ -25,3 +25,4 @@ ocr-engine/*.png
 ocr-engine/data/processed/test_*.png
 ocr-engine/**/__pycache__/
 ocr-engine/**/*old.*
+ocr-engine/.*
