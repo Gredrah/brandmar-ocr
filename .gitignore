@@ -16,6 +16,9 @@
 **/.DS_Store
 **/Thumbs.db
 
+# Oracle Cloud Functions
+.wrangler/
+
 # VS Code Specific
 **/.vscode/
 
