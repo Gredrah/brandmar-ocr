@@ -29,6 +29,12 @@ jobs:
           
           # Merge the histories. '-X ours' ensures your custom code wins any merge conflicts.
           git merge upstream/main --allow-unrelated-histories -s recursive -X ours
+
+          # NEW: Search and destroy wrangler.toml if the upstream repo tried to bring it back
+          if [ -f "wrangler.toml" ]; then
+            git rm -f wrangler.toml
+            git commit -m "Auto-remove wrangler.toml to keep Cloudflare dashboard variables unlocked" || true
+          fi
           
       - name: Push changes to your repo
         run: git push origin main
