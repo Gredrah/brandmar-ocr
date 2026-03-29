@@ -120,6 +120,9 @@ function buildRowValues(payload) {
 }
 
 async function validateAndHighlightRow(spreadsheetId, targetSheetId, sheetName, targetRow, accessToken) {
+    // Delay added to help ensure data is available for reading after the write operation
+    await new Promise(resolve => setTimeout(resolve, 1200)); 
+
     // 1. Fetch values from P and Q
     const readRange = `${encodeURIComponent(sheetName)}!P${targetRow}:Q${targetRow}`;
     const readUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`;
