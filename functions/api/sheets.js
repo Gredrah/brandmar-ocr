@@ -46,10 +46,14 @@ async function ensureSheetExists(spreadsheetId, sheetName, monthIndex, year, acc
     }
     const metaData = await metaResponse.json();
     let sheetExists = false;
+    let targetSheetId = null;
     let templateSheetId = null;
     let templateSheetIndex = null;
     for (const sheet of metaData.sheets) {
-        if (sheet.properties.title === sheetName) sheetExists = true;
+        if (sheet.properties.title === sheetName) {
+            sheetExists = true;
+            targetSheetId = sheet.properties.sheetId;
+        }
         if (sheet.properties.title === "Template") {
             templateSheetId = sheet.properties.sheetId;
             templateSheetIndex = sheet.properties.index;
@@ -80,6 +84,10 @@ async function ensureSheetExists(spreadsheetId, sheetName, monthIndex, year, acc
         if (!duplicateReq.ok) {
             throw new Error(`Failed to create new month sheet: ${await duplicateReq.text()}`);
         }
+
+        const duplicateRes = await duplicateReq.json();
+        targetSheetId = duplicateRes.replies[0].duplicateSheet.properties.sheetId;
+
         // Set cell A2 to the first of the month
         const firstOfMonth = `${monthIndex + 1}/1/${year}`;
         const updateA2Url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A2?valueInputOption=USER_ENTERED`;
@@ -94,6 +102,7 @@ async function ensureSheetExists(spreadsheetId, sheetName, monthIndex, year, acc
             })
         });
     }
+    return targetSheetId;
 }
 
 function buildRowValues(payload) {
@@ -186,7 +195,7 @@ export async function onRequestPost(context) {
         if (!spreadsheetId) throw new Error("No target spreadsheet ID provided.");
 
         // 3. Ensure sheet exists
-        await ensureSheetExists(spreadsheetId, sheetName, monthIndex, year, accessToken);
+        const targetSheetId = await ensureSheetExists(spreadsheetId, sheetName, monthIndex, year, accessToken);
 
         // 4. Write the daily data row
         const range = `${encodeURIComponent(sheetName)}!J${targetRow}:R${targetRow}`;
@@ -203,7 +212,7 @@ export async function onRequestPost(context) {
             })
         });
         if (!response.ok) {
-            const errorText = await writeResponse.text();
+            const errorText = await response.text();
             throw new Error(`Google API Error: ${errorText}`);
         }
 
