@@ -26,6 +26,8 @@
 # Anthropic
 **/*.anth
 
+# wrangler
+wrangler.toml
 
 # OCR Engine Ignore
 .bak
