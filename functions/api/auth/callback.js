@@ -1,5 +1,8 @@
 // webapp/functions/api/auth/callback.js
 
+// Callback Endpoint: GET /api/auth/callback
+// Description: The return destination for Google OAuth. Validates the code, fetches the access token, and sets the HTTP-Only cookie to establish the session.
+
 export async function onRequestGet(context) {
     const url = new URL(context.request.url);
     const code = url.searchParams.get('code');
@@ -37,6 +40,7 @@ export async function onRequestGet(context) {
         });
 
         // 4. Set the session cookie and redirect back to the main app
+        // The SameSite=Lax and Secure flags ensure the session works seamlessly with the frontend JS fetch requests
         const headers = new Headers();
         headers.append('Set-Cookie', `session_id=${sessionId}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${tokens.expires_in}`);
         headers.append('Location', '/');

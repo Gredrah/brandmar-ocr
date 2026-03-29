@@ -1,25 +1,111 @@
 /**
  * @file app.js
- * @description Client-side logic for the Distributor OCR Processor.
+ * @description Client-side SDK and logic for the Distributor OCR Processor.
  *
- * USAGE:
- * 1. User selects up to 3 receipt images and submits the form (#ocr-form).
- * 2. Images are compressed client-side, displayed for debugging, and sent to the backend for OCR processing.
- * 3. OCR results are shown in a textarea (#json-output).
- * 4. User can edit the JSON and export it to Google Sheets using the export button (#export-btn).
- * 5. Status and error messages are displayed in #status-message.
+ * HOW TO USE THIS API (For HTML/Frontend Developer):
+ * * This file exposes a global object called `BrandmarAPI`. You can call these methods 
+ * from anywhere in your frontend code without worrying about DOM element IDs.
+ * * Core Methods:
+ * - BrandmarAPI.isAuthenticated() -> Checks if the user has an active Google session.
+ * - BrandmarAPI.getAvailableWorkbooks() -> Returns an array of valid Google Sheets.
+ * - BrandmarAPI.compressImage(file) -> Utility to shrink images before sending to save bandwidth/tokens.
+ * - BrandmarAPI.processReceipts(files) -> Sends images to Gemini AI and returns extracted JSON data.
+ * - BrandmarAPI.exportToSheet(sheetId, data) -> Pushes the final JSON data into the selected Google Sheet.
+ * * Note: The bottom half of this file contains temporary UI bindings for `index.html`. 
+ * You can safely delete or replace the "UI LOGIC & EVENT LISTENERS" section when building the final interface, unless you find it useful.
  */
 
-/**
- * BRANDMAR OCR - FRONTEND API
- * All network calls are encapsulated here for easy UI integration.
- */
-const BrandmarAPI = {
-    // 1. Process images through Gemini
+globalThis.BrandmarAPI = {
     /**
-     * processReceipts - Takes an array of image files, sends them to the backend for OCR processing, and returns the extracted data.
-     * @param {File[]} imageFiles - Array of image files to process.
-     * @returns {Promise<Object>} - A promise resolving to the extracted data.
+     * Checks if the user is currently authenticated with a valid session.
+     * Useful for determining whether to show the Login button or the main app interface.
+     * * @returns {Promise<boolean>} - True if authenticated, false otherwise.
+     */
+    async isAuthenticated() {
+        try {
+            await this.getAvailableWorkbooks();
+            return true;
+        } catch (error) {
+            console.error('isAuthenticated error:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Fetches a list of available Google Sheets workbooks that the user can export to.
+     * Filters automatically based on the backend regex (e.g., "Brandmar Holdings 202X").
+     * * @returns {Promise<Array>} - A promise resolving to an array of available workbook objects {id, name}.
+     * @throws {Error} - Throws "unauthorized" if the user needs to log in.
+     */
+    async getAvailableWorkbooks() {
+        const response = await fetch('/api/workbooks', { method: 'GET' });
+        if (!response.ok) {
+            if (response.status === 401) throw new Error("unauthorized");
+            throw new Error("Failed to fetch workbooks");
+        }
+        return await response.json(); 
+    },
+
+    /**
+     * Native Image Compression for Token Reduction.
+     * Shrinks large photos client-side before they are sent to the server.
+     * * @param {File} file - The raw image file from the input element.
+     * @param {number} [maxDimension=1200] - The maximum width or height.
+     * @param {number} [quality=0.85] - JPEG compression quality (0.0 to 1.0).
+     * @returns {Promise<File>} - The compressed image file.
+     */
+    async compressImage(file, maxDimension = 1200, quality = 0.85) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = handleReaderLoad;
+            reader.onerror = (error) => reject(new Error(error?.message || error?.type || 'FileReader error'));
+
+            function handleReaderLoad(event) {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => handleImageLoad(img);
+                img.onerror = (error) => reject(new Error(error?.message || error?.type || 'FileReader error'));
+            }
+
+            function handleImageLoad(img) {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height && width > maxDimension) {
+                    height = Math.round((height * maxDimension) / width);
+                    width = maxDimension;
+                } else if (height > maxDimension) {
+                    width = Math.round((width * maxDimension) / height);
+                    height = maxDimension;
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob(handleCanvasBlob, 'image/jpeg', quality);
+            }
+
+            function handleCanvasBlob(blob) {
+                resolve(new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                }));
+            }
+        });
+    },
+
+    /**
+     * Takes an array of image files, sends them to the backend for OCR processing, 
+     * and returns the structured JSON extracted by Gemini.
+     * * @param {File[]} imageFiles - Array of image files (ideally compressed first) to process.
+     * @returns {Promise<Object>} - A promise resolving to the extracted JSON data payload.
      */
     async processReceipts(imageFiles) {
         const formData = new FormData();
@@ -35,26 +121,11 @@ const BrandmarAPI = {
         return await response.json();
     },
 
-    // 2. Fetch available workbooks from Google Drive
     /**
-     * getAvailableWorkbooks - Fetches a list of available Google Sheets workbooks that the user can export to.
-     * @returns {Promise<Array>} - A promise resolving to an array of available workbooks.
-     */
-    async getAvailableWorkbooks() {
-        const response = await fetch('/api/workbooks', { method: 'GET' });
-        if (!response.ok) {
-            if (response.status === 401) throw new Error("unauthorized");
-            throw new Error("Failed to fetch workbooks");
-        }
-        return await response.json(); 
-    },
-
-    // 3. Export data to the selected sheet
-    /**
-     * exportToSheet - Exports the extracted data to the specified Google Sheet.
-     * @param {string} spreadsheetId - The ID of the target spreadsheet.
-     * @param {Object} extractedData - The data to export.
-     * @returns {Promise<Object>} - A promise resolving to the export result.
+     * Exports the verified OCR data to the specified Google Sheet.
+     * * @param {string} spreadsheetId - The target Google Sheet ID selected by the user.
+     * @param {Object} extractedData - The JSON data payload containing the receipt info.
+     * @returns {Promise<Object>} - The server response containing success status and any validation warnings.
      */
     async exportToSheet(spreadsheetId, extractedData) {
         // Attach the target ID to the payload
@@ -69,53 +140,11 @@ const BrandmarAPI = {
     }
 };
 
-// Native Image Compression for Token Reduction
-async function compressImage(file, maxDimension = 1200, quality = 0.85) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = handleReaderLoad;
-        reader.onerror = (error) => reject(new Error(error?.message || error?.type || 'FileReader error'));
-
-        function handleReaderLoad(event) {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => handleImageLoad(img);
-            img.onerror = (error) => reject(new Error(error?.message || error?.type || 'FileReader error'));
-        }
-
-        function handleImageLoad(img) {
-            let width = img.width;
-            let height = img.height;
-
-            if (width > height && width > maxDimension) {
-                height = Math.round((height * maxDimension) / width);
-                width = maxDimension;
-            } else if (height > maxDimension) {
-                width = Math.round((width * maxDimension) / height);
-                height = maxDimension;
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, width, height);
-            ctx.drawImage(img, 0, 0, width, height);
-
-            canvas.toBlob(handleCanvasBlob, 'image/jpeg', quality);
-        }
-
-        function handleCanvasBlob(blob) {
-            resolve(new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
-                type: 'image/jpeg',
-                lastModified: Date.now()
-            }));
-        }
-    });
-}
+/* ==========================================================================
+   UI LOGIC & EVENT LISTENERS (Example Implementation)
+   Note for HTML Dev: This section handles the temporary index.html UI. 
+   You can delete everything below this line when building the final interface.
+   ========================================================================== */
 
 // Helper to render compressed images to the DOM for debugging
 function renderDebugImages(compressedFiles) {
@@ -143,9 +172,6 @@ function renderDebugImages(compressedFiles) {
     });
 }
 
-/**
- * UI LOGIC & EVENT LISTENERS
- */
 document.addEventListener('DOMContentLoaded', async () => {
     const authSection = document.getElementById('auth-section');
     const workbookSection = document.getElementById('workbook-section');
@@ -154,9 +180,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const statusMsg = document.getElementById('status-message'); // Corrected to match index.html
     const jsonOutput = document.getElementById('json-output');
 
-    // 1. Check Auth and Load Workbooks on Page Load
+    // Check Auth and Load Workbooks on Page Load
     try {
-        const workbooks = await BrandmarAPI.getAvailableWorkbooks();
+        const workbooks = await globalThis.BrandmarAPI.getAvailableWorkbooks();
         
         // If successful, user is logged in. Hide Auth, show Workbook Dropdown.
         authSection.style.display = 'none';
@@ -185,7 +211,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 2. The Export Button Listener
+    // The Export Button Listener
     exportBtn.addEventListener('click', async () => {
         try {
             // Read directly from the textarea so any manual user edits are captured
@@ -205,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             exportBtn.disabled = true;
             statusMsg.innerHTML = 'Pushing to Google Sheets...';
 
-            const result = await BrandmarAPI.exportToSheet(selectedSheetId, dataToExport);
+            const result = await globalThis.BrandmarAPI.exportToSheet(selectedSheetId, dataToExport);
             
             // Handle validation warnings (e.g., Column P vs Q mismatch)
             if (result.warning) {
@@ -221,7 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // 3. The Form Submit Listener
+    // The Form Submit Listener
     const ocrForm = document.getElementById('ocr-form');
     const submitBtn = document.getElementById('submit-btn');
 
@@ -242,14 +268,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportBtn.style.display = 'none';
 
         try {
-            // Compress images to save bandwidth and API tokens
-            const compressedFiles = await Promise.all(files.map(f => compressImage(f)));
+            // Compress images to save bandwidth and API tokens utilizing the core API
+            const compressedFiles = await Promise.all(files.map(f => globalThis.BrandmarAPI.compressImage(f)));
             
             // Render the debug images to the DOM
             renderDebugImages(compressedFiles);
 
-            // Send to the backend API
-            const extractedData = await BrandmarAPI.processReceipts(compressedFiles);
+            // Send to the backend API utilizing the core API
+            const extractedData = await globalThis.BrandmarAPI.processReceipts(compressedFiles);
 
             // Update UI with the results
             jsonOutput.value = JSON.stringify(extractedData, null, 2);
