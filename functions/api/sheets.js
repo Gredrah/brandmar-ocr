@@ -4,6 +4,8 @@
 // Consumed by: BrandmarAPI.exportToSheet()
 // Description: Receives verified OCR JSON from the frontend and pushes it to the designated Google Sheet.
 // Requires valid session cookies to access Google Sheets API.
+// Warnings: If the calculated gross profit (Column Q) does not match the provided gross profit (Column P), 
+// * Column I of that row will be highlighted red, and a warning message will be returned in the API response, instead of success.
 
 function getCookie(request, name) {
     const cookieString = request.headers.get('Cookie');
