@@ -1,5 +1,12 @@
 // webapp/functions/api/sheets.js
 
+// API Endpoint: POST /api/sheets
+// Consumed by: BrandmarAPI.exportToSheet()
+// Description: Receives verified OCR JSON from the frontend and pushes it to the designated Google Sheet.
+// Requires valid session cookies to access Google Sheets API.
+// Warnings: If the calculated gross profit (Column Q) does not match the provided gross profit (Column P), 
+// * Column I of that row will be highlighted red, and a warning message will be returned in the API response, instead of success.
+
 function getCookie(request, name) {
     const cookieString = request.headers.get('Cookie');
     if (!cookieString) return null;
@@ -7,6 +14,7 @@ function getCookie(request, name) {
     return match ? match[2] : null;
 }
 
+// Authentication helper middleware used before executing sheet logic
 async function getSessionAndToken(context) {
     const sessionId = getCookie(context.request, 'session_id');
     if (!sessionId) {
@@ -183,6 +191,7 @@ async function validateAndHighlightRow(spreadsheetId, targetSheetId, sheetName, 
 
 export async function onRequestPost(context) {
     try {
+        // Expects the frontend to merge target_spreadsheet_id into the OCR JSON payload
         const payload = await context.request.json();
 
         // 1. Session & Auth Check
@@ -226,6 +235,7 @@ export async function onRequestPost(context) {
         );
 
         // Pass the warning (or null) back to the client
+        // The frontend SDK relies on this exact JSON structure to surface UI alerts
         return new Response(JSON.stringify({ 
             success: true,
             warning: validationWarning

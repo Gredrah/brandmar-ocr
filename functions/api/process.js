@@ -1,5 +1,9 @@
 // webapp/functions/api/process.js
 
+// API Endpoint: POST /api/process
+// Consumed by: BrandmarAPI.processReceipts()
+// Description: Receives multipart/form-data containing receipt images, sends them to Gemini 2.5 Flash for OCR, and returns structured JSON.
+
 const SYSTEM_PROMPT = `
     You will receive images of three types of receipts: 'Distributor's Summary', 'Distributor's Gross Profit', and 'Payments Received'.
     
@@ -64,9 +68,11 @@ function arrayBufferToBase64(buffer) {
 export async function onRequestPost(context) {
   try {
     const formData = await context.request.formData();
+    // The frontend SDK must append files to the 'receipts' key in the FormData object
     const imageFiles = formData.getAll('receipts');
 
     if (!imageFiles || imageFiles.length === 0) {
+      // Returns a standard 400 error object if the frontend SDK sends an empty request
       return new Response(JSON.stringify({ error: "No valid images provided." }), { status: 400 });
     }
 
@@ -118,6 +124,7 @@ export async function onRequestPost(context) {
 
     if (!geminiResponse.ok) {
       const errorData = await geminiResponse.text();
+      // Throwing here catches it in the main try/catch block and returns a 500 to the frontend
       throw new Error(`Gemini API Error: ${geminiResponse.status} - ${errorData}`);
     }
 
@@ -139,6 +146,7 @@ export async function onRequestPost(context) {
       errorMessage = e.message + ": Failed to parse JSON from Gemini's response.";
     }
 
+    // Ensures the API always returns a consistent object shape, even on partial failures
     const finalResponse = parsed || { error: errorMessage, raw: rawText };
 
     return new Response(JSON.stringify(finalResponse), {

@@ -1,5 +1,9 @@
 // webapp/functions/api/workbooks.js
 
+// API Endpoint: GET /api/workbooks
+// Consumed by: BrandmarAPI.getAvailableWorkbooks()
+// Description: Queries Google Drive for files matching the specific workbook naming convention and returns an array of options.
+
 function getCookie(request, name) {
     const cookieString = request.headers.get('Cookie');
     if (!cookieString) return null;
@@ -10,6 +14,7 @@ function getCookie(request, name) {
 export async function onRequestGet(context) {
     try {
         // 1. Session & Auth Check
+        // If these fail, a 401 is sent to the frontend. The SDK uses this 401 specifically to determine if BrandmarAPI.isAuthenticated() is true or false.
         const sessionId = getCookie(context.request, 'session_id');
         if (!sessionId) {
             return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
@@ -52,6 +57,7 @@ export async function onRequestGet(context) {
         const filteredFiles = allFiles.filter(file => yearRegex.test(file.name));
 
         // 4. Return the filtered array to the frontend
+        // Expected format: [{ id: "...", name: "..." }, ...]
         return new Response(JSON.stringify(filteredFiles), { 
             status: 200,
             headers: { 'Content-Type': 'application/json' }
