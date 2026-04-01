@@ -1,5 +1,5 @@
 // webapp/functions/api/auth/callback.js
-import './authHelpers.js';
+import { getCookie } from './authHelpers.js';
 
 // Callback Endpoint: GET /api/auth/callback
 // Usage: This is the redirect URI set in the Google Cloud Console for your OAuth credentials. Google will send users here after they authorize the app.

@@ -1,16 +1,9 @@
 // webapp/functions/api/workbooks.js
+import { getCookie } from './auth/authHelpers.js';
 
 // API Endpoint: GET /api/workbooks
 // Consumed by: BrandmarAPI.getAvailableWorkbooks()
 // Description: Queries Google Drive for files matching the specific workbook naming convention and returns an array of options.
-
-function getCookie(request, name) {
-    const cookieString = request.headers.get('Cookie');
-    if (!cookieString) return null;
-    const match = cookieString.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? match[2] : null;
-}
-
 export async function onRequestGet(context) {
     try {
         // 1. Session & Auth Check
