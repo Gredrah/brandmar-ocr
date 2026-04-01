@@ -1,5 +1,5 @@
 // webapp/functions/api/auth/token.js
-import './authHelpers.js';
+import { getCookie } from './authHelpers.js';
 
 // Token Endpoint: GET /api/auth/token
 // Usage: Called by the frontend to retrieve the Google API access token for the current session. 

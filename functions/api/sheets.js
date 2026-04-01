@@ -1,4 +1,5 @@
 // webapp/functions/api/sheets.js
+import { getCookie } from './auth/authHelpers.js';
 
 // API Endpoint: POST /api/sheets
 // Consumed by: BrandmarAPI.exportToSheet()
@@ -6,14 +7,6 @@
 // Requires valid session cookies to access Google Sheets API.
 // Warnings: If the calculated gross profit (Column Q) does not match the provided gross profit (Column P), 
 // * Column I of that row will be highlighted red, and a warning message will be returned in the API response, instead of success.
-
-function getCookie(request, name) {
-    const cookieString = request.headers.get('Cookie');
-    if (!cookieString) return null;
-    const match = cookieString.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? match[2] : null;
-}
-
 // Authentication helper middleware used before executing sheet logic
 async function getSessionAndToken(context) {
     const sessionId = getCookie(context.request, 'session_id');
