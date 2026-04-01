@@ -18,7 +18,11 @@ export async function onRequestGet(context) {
         return new Response(JSON.stringify({ error: "session expired" }), { status: 401 });
     }
 
-    return new Response(JSON.stringify({ access_token: accessToken }), { 
+    // Return both the token and the Client ID from the Cloudflare environment
+    return new Response(JSON.stringify({ 
+        access_token: accessToken,
+        client_id: context.env.GOOGLE_CLIENT_ID 
+    }), { 
         status: 200,
         headers: { 'Content-Type': 'application/json' }
     });
